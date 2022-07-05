@@ -1,0 +1,94 @@
+- command: update
+  path: Resources.KmsKey
+  value:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: KMS key to use for EKS volume encryption
+      Enabled: true
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: eks-encryption-key-policy
+        Statement:
+          - Sid: Enable IAM User Permissions for this account
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: Enable IAM Permissions for Node role
+            Effect: Allow
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+              - "kms:List*"
+            Resource: "*"
+          - Sid: Allow service-linked role use of CMK
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling'
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+            Resource: "*"
+          - Sid: Allow attachment of persistent Resources
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling'
+            Action:
+              - "kms:CreateGrant"
+            Resource: "*"
+            Condition:
+              Bool:
+                'kms:GrantIsForAWSResource': true
+
+- command: update
+  path: Resources.KmsKeyAlias
+  value:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/${AWS::StackName}-ebs-key
+      TargetKeyId: !Ref KmsKey
+
+- command: update
+  path: Resources.NodeInstanceRole.Properties.Policies[+]
+  value:
+      PolicyName: !Sub '${AWS::StackName}-kms-encrypt-policy'
+      PolicyDocument:
+       Version: 2012-10-17
+       Statement:
+         - Action:
+             - "kms:Encrypt"
+             - "kms:Decrypt"
+             - "kms:ReEncrypt*"
+             - "kms:GenerateDataKey"
+             - "kms:DescribeKey"
+             - "kms:List*"
+             - "kms:CreateGrant"
+             - "kms:GenerateDataKeyWithoutPlainText"
+           Effect: Allow
+           Resource: '*'
+
+# - command: update
+#   path: Resources.PolicyKMS
+#   value:
+#     Type: 'AWS::IAM::Policy'
+#     Properties:
+#       PolicyDocument:
+#         Statement:
+#           - Action:
+#               - "kms:Encrypt"
+#               - "kms:Decrypt"
+#               - "kms:ReEncrypt*"
+#               - "kms:GenerateDataKey"
+#               - "kms:DescribeKey"
+#               - "kms:List*"
+#             Effect: Allow
+#             Resource: !Ref KmsKey
+#         Version: 2012-10-17
+#       PolicyName: '${AWS::StackName}-kms-encrypt-policy'
